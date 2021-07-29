@@ -4,38 +4,48 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"flag"
-	"github.com/gocolly/colly/v2"
+	"fmt"
 	"log"
 	"os"
+
+	"github.com/gocolly/colly/v2"
 )
 
 type Article struct {
-	Tag string `json:"tag"`
-	Title string `json:"title"`
-	Intro string `json:"intro"`
-	Author string `json:"author"`
-	Url string `json:"url"`
+	Tag     string `json:"tag"`
+	Title   string `json:"title"`
+	Intro   string `json:"intro"`
+	Author  string `json:"author"`
+	Url     string `json:"url"`
 	Content string `json:"content"`
-	Date string `json:"date"`
+	Date    string `json:"date"`
 }
 
 func main() {
 
 	useUrl := flag.String("url", "", "Input target url.")
-	useOut := flag.String("out", "", "Out put the file.")
+	useOut := flag.String("out", "", "Out put file path.")
 	useFormat := flag.String("format", "json", "File format.")
 	flag.Parse()
 
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: [command] -url='https://fijisun.com.fj/category/news/' -out=data.csv -format=csv")
+		os.Exit(0)
+	}
+
 	if *useUrl == "" {
-		log.Fatalf("Mast be input url")
+		fmt.Println("Must input target url for crawler.")
+		os.Exit(0)
 	}
 
 	if *useOut == "" {
-		log.Fatalf("Mast be input url")
+		fmt.Println("Must input file path for crawler.")
+		os.Exit(0)
 	}
 
 	if *useFormat != "json" && *useFormat != "csv" {
-		log.Fatalf("The file format only support 'json' and 'csv'.")
+		fmt.Println("The file format only support 'json' and 'csv'.")
+		os.Exit(0)
 	}
 
 	c := colly.NewCollector(colly.Async(true))
@@ -45,7 +55,7 @@ func main() {
 
 	c.OnError(func(response *colly.Response, err error) {
 		log.Println("ERROR", err.Error())
-		//response.Request.Retry()
+		response.Request.Retry()
 	})
 
 	c.OnRequest(func(request *colly.Request) {
@@ -66,7 +76,7 @@ func main() {
 
 			cc.OnError(func(response *colly.Response, err error) {
 				log.Println("ERROR", err.Error())
-				//response.Request.Retry()
+				response.Request.Retry()
 			})
 
 			cc.OnRequest(func(request *colly.Request) {
@@ -77,12 +87,12 @@ func main() {
 				date := e.ChildText("div.article-controls > div.left-side > div")
 				content := e.ChildText("div.shortcode-content p")
 				articles = append(articles, Article{
-					Tag: tag,
-					Title: title,
-					Intro: intro,
-					Author: author,
-					Url: url,
-					Date: date,
+					Tag:     tag,
+					Title:   title,
+					Intro:   intro,
+					Author:  author,
+					Url:     url,
+					Date:    date,
 					Content: content,
 				})
 			})
@@ -104,14 +114,15 @@ func main() {
 
 	c.Wait()
 
-	//enc := json.NewEncoder(os.Stdout)
-	//enc.SetIndent("", "  ")
-	//enc.Encode(articles)
+	if len(articles) == 0 {
+		fmt.Println("No data.")
+		os.Exit(0)
+	}
 
 	file, err := os.Create(*useOut)
 
 	if err != nil {
-		log.Fatalf("Failed creating file: %s", err)
+		fmt.Printf("Failed creating file: %s", err)
 	}
 	defer file.Close()
 
@@ -127,7 +138,7 @@ func main() {
 
 	if *useFormat == "csv" {
 		writer := csv.NewWriter(file)
-		writer.Write([]string{"类别", "标题", "简介", "作者", "链接", "时间", "内容"})
+		writer.Write([]string{"tag", "title", "intro", "author", "url", "date", "content"})
 		for _, article := range articles {
 			writer.Write([]string{article.Tag, article.Title, article.Intro, article.Author, article.Url, article.Date, article.Content})
 		}
@@ -135,6 +146,6 @@ func main() {
 		return
 	}
 
-	log.Fatalf("Invalid filename.")
-
+	fmt.Println("Invalid filename.")
+	os.Exit(0)
 }
